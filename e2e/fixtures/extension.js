@@ -18,9 +18,12 @@ const test = base.extend({
     const { browserType, extensionPath } = testInfo.project.use;
     const baseType = browserType === "firefox" ? firefox : chromium;
     const wrapped = withExtension(baseType, extensionPath);
-    const context = await wrapped.launchPersistentContext(userDataDir, {
-      headless: false
-    });
+    // Chromium supports headless extensions via channel: "chromium"
+    // (Playwright >=1.46). Firefox still requires headed.
+    const launchOptions = browserType === "firefox"
+      ? { headless: false }
+      : { headless: true, channel: "chromium" };
+    const context = await wrapped.launchPersistentContext(userDataDir, launchOptions);
     await use(context);
     await context.close();
   },
