@@ -137,17 +137,13 @@ const createTabGroups = async (windowId, tabs, tabGroupsInfo) => {
   }
 
   for (let group of Object.values(groups)) {
-    browser.tabs.group(
-      {
-        createProperties: { windowId: windowId },
-        tabIds: group.tabIds
-      },
-      groupId => {
-        const groupInfo = tabGroupsInfo.find(info => info.id === group.originalGroupId);
-        if (!groupInfo) return;
-        if (getSettings("saveTabGroupsV2")) updateTabGroups(groupId, groupInfo);
-      }
-    );
+    const groupId = await browser.tabs.group({
+      createProperties: { windowId: windowId },
+      tabIds: group.tabIds
+    });
+    const groupInfo = tabGroupsInfo.find(info => info.id === group.originalGroupId);
+    if (!groupInfo) continue;
+    if (getSettings("saveTabGroupsV2")) await updateTabGroups(groupId, groupInfo);
   }
 };
 
