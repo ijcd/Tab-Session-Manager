@@ -3,3 +3,7 @@ dist
 dev
 temp
 src/credentials.js
+e2e/.fixtures/
+test-results/
+playwright-report/
+playwright/.cache/
