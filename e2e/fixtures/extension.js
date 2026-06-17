@@ -23,6 +23,10 @@ const test = base.extend({
     // (Playwright >=1.46). Firefox still requires headed.
     const launchOptions = browserType === "firefox"
       ? {
+          // FF + extensions cannot run headless under Playwright; the
+          // Browser.newPage protocol errors out. We launch headed but
+          // position the window off-screen so it does not steal focus
+          // (see firefoxUserPrefs below).
           headless: false,
           acceptDownloads: true,
           // Auto-accept downloads to a temp dir so the FF "save file"
@@ -32,8 +36,16 @@ const test = base.extend({
           firefoxUserPrefs: {
             "browser.download.folderList": 2,
             "browser.download.manager.showWhenStarting": false,
-            "browser.helperApps.neverAsk.saveToDisk": "application/json,text/plain,application/octet-stream"
-          }
+            "browser.helperApps.neverAsk.saveToDisk": "application/json,text/plain,application/octet-stream",
+            // Open the test window off the visible screen so it does not
+            // steal focus on dev machines. Negative coords are clamped
+            // back on macOS, so use a far-right offset that lands on a
+            // typical non-existent virtual display.
+            "browser.window.x": 5000,
+            "browser.window.y": 5000,
+            "browser.startup.page": 0
+          },
+          args: ["-width", "100", "-height", "100"]
         }
       : { headless: true, channel: "chromium" };
     const context = await wrapped.launchPersistentContext(userDataDir, launchOptions);
