@@ -38,7 +38,8 @@ function wrapChromePage(page) {
     evaluate: (...args) => page.evaluate(...args),
     $$eval: (sel, fn, ...args) => page.$$eval(sel, fn, ...args),
     helperCall: async (name, args = []) => {
-      // Chrome path can run arbitrary code in the page directly.
+      // Chrome path runs the helper directly in the page (no CSP issues
+      // because extension pages can call functions normally).
       const evalMap = {
         rootMounted: () => {
           const r = document.querySelector("#root");
@@ -48,7 +49,33 @@ function wrapChromePage(page) {
           document.body && document.body.innerText
             ? document.body.innerText.length
             : 0,
-        queryAllCount: sel => document.querySelectorAll(sel).length
+        queryAllCount: sel => document.querySelectorAll(sel).length,
+        clickFirst: sel => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          el.click();
+          return true;
+        },
+        clickFirstByText: (sel, text) => {
+          const els = document.querySelectorAll(sel);
+          for (const el of els) {
+            if ((el.innerText || "").indexOf(text) >= 0) {
+              el.click();
+              return true;
+            }
+          }
+          return false;
+        },
+        setHash: hash => {
+          window.location.hash = hash;
+          return window.location.hash;
+        },
+        getHash: () => window.location.hash,
+        selectorTextContains: (sel, needle) => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          return (el.innerText || "").indexOf(needle) >= 0;
+        }
       };
       return page.evaluate(({ fnSrc, a }) => {
         // eslint-disable-next-line no-new-func

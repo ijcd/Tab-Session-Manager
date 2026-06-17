@@ -79,9 +79,11 @@ async function setSettings(page, patch) {
     await browser.runtime.sendMessage({ message: "getInitState" });
   });
   // Poll until the SW has populated defaults for the keys we are about
-  // to patch — confirms init() finished.
+  // to patch — confirms init() finished. Larger timeout under coverage
+  // because the instrumented bundle takes longer to boot.
   const { poll } = require("./poll");
-  await poll(8000, 200, async () => {
+  const initTimeout = process.env.COVERAGE === "1" ? 30000 : 8000;
+  await poll(initTimeout, 200, async () => {
     const present = await page.evaluate(async () => {
       return (await browser.storage.local.get("Settings")).Settings ? true : false;
     });
@@ -93,7 +95,8 @@ async function setSettings(page, patch) {
   }, patch);
   // Verify the storage write took effect AND wait for storage.onChanged
   // → handleSettingsChange to refresh the in-memory currentSettings.
-  await poll(8000, 100, async () => {
+  const verifyTimeout = process.env.COVERAGE === "1" ? 15000 : 8000;
+  await poll(verifyTimeout, 100, async () => {
     const ok = await page.evaluate(async expected => {
       const s = (await browser.storage.local.get("Settings")).Settings || {};
       return Object.entries(expected).every(([k, v]) => s[k] === v);

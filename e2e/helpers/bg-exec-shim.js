@@ -29,6 +29,34 @@
     },
     queryAllCount: function (selector) {
       return document.querySelectorAll(selector).length;
+    },
+    clickFirst: function (selector) {
+      var el = document.querySelector(selector);
+      if (!el) return false;
+      el.click();
+      return true;
+    },
+    clickFirstByText: function (selector, text) {
+      var els = document.querySelectorAll(selector);
+      for (var i = 0; i < els.length; i++) {
+        if ((els[i].innerText || "").indexOf(text) >= 0) {
+          els[i].click();
+          return true;
+        }
+      }
+      return false;
+    },
+    setHash: function (hash) {
+      window.location.hash = hash;
+      return window.location.hash;
+    },
+    getHash: function () {
+      return window.location.hash;
+    },
+    selectorTextContains: function (selector, needle) {
+      var el = document.querySelector(selector);
+      if (!el) return false;
+      return (el.innerText || "").indexOf(needle) >= 0;
     }
   };
 
