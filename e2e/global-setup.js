@@ -66,5 +66,13 @@ function patchFirefoxManifest(manifestPath) {
   manifest.content_scripts = [
     { matches: ["https://e2e-harness.invalid/*"], js: [] }
   ];
+  // MV3 strict mode: extension pages need to be web_accessible_resources to
+  // be navigable from a top-level tab driven by the Marionette protocol.
+  manifest.web_accessible_resources = [
+    {
+      resources: ["popup/index.html", "options/index.html", "offscreen/index.html"],
+      matches: ["<all_urls>"]
+    }
+  ];
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 }

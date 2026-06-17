@@ -41,6 +41,13 @@ const test = base.extend({
   // offscreen/index.html because it loads webextension-polyfill (exposes
   // `browser`) without spinning up the React popup/options UI or depending on
   // the background being ready.
+  // FIREFOX NOTE: Playwright's patched Firefox build does not commit
+  // top-level navigation to moz-extension:// URLs reliably. The UUID can be
+  // read from per-profile prefs.js but page.goto() to any extension page
+  // (options, popup, offscreen) hangs at the commit step. Specs run on the
+  // chrome-mv3 project; the firefox-mv3 project is wired but the test bodies
+  // bail out at extensionPage setup. Tracking as upstream playwright /
+  // playwright-webextext concern.
   extensionPage: async ({ context, extensionId }, use, testInfo) => {
     const { browserType } = testInfo.project.use;
     const scheme = browserType === "firefox" ? "moz-extension" : "chrome-extension";
