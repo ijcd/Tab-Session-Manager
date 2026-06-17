@@ -1,12 +1,14 @@
 const { test, expect } = require("./fixtures/extension");
 const { importSessions, buildSession } = require("./helpers/session");
+const { openExtensionPage } = require("./helpers/extension-tab");
+const { poll } = require("./helpers/poll");
 
 test("popup page renders the React app", async ({
   context,
   extensionId,
   extensionPage
-}) => {
-  // Seed a session so the popup has something to show.
+}, testInfo) => {
+  const browserType = testInfo.project.use.browserType;
   await importSessions(extensionPage, [
     buildSession({
       id: "e2e-popup-seed",
@@ -16,13 +18,15 @@ test("popup page renders the React app", async ({
   ]);
   await extensionPage.waitForTimeout(300);
 
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/popup/index.html`);
-  await page.waitForFunction(
-    () => document.querySelector("#root") && document.querySelector("#root").children.length > 0,
-    { timeout: 15000 }
-  );
-  const bodyText = await page.evaluate(() => document.body.innerText.length);
-  expect(bodyText).toBeGreaterThan(0);
-  await page.close();
+  const p = await openExtensionPage({
+    context,
+    extensionId,
+    extensionPage,
+    browserType,
+    relPath: "popup/index.html"
+  });
+  await poll(15000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
+  const bodyLen = await p.helperCall("bodyTextLength");
+  expect(bodyLen).toBeGreaterThan(0);
+  await p.close();
 });

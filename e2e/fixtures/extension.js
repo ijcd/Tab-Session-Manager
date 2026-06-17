@@ -22,7 +22,19 @@ const test = base.extend({
     // Chromium supports headless extensions via channel: "chromium"
     // (Playwright >=1.46). Firefox still requires headed.
     const launchOptions = browserType === "firefox"
-      ? { headless: false }
+      ? {
+          headless: false,
+          acceptDownloads: true,
+          // Auto-accept downloads to a temp dir so the FF "save file"
+          // dialog does not hang context teardown when a test triggers
+          // browser.downloads.download.
+          downloadsPath: fs.mkdtempSync(path.join(os.tmpdir(), "tsm-dl-")),
+          firefoxUserPrefs: {
+            "browser.download.folderList": 2,
+            "browser.download.manager.showWhenStarting": false,
+            "browser.helperApps.neverAsk.saveToDisk": "application/json,text/plain,application/octet-stream"
+          }
+        }
       : { headless: true, channel: "chromium" };
     const context = await wrapped.launchPersistentContext(userDataDir, launchOptions);
     await use(context);
@@ -43,30 +55,49 @@ const test = base.extend({
     await use(id);
   },
 
-  // A blank extension-origin page used as the test's vantage point. We use
-  // offscreen/index.html because it loads webextension-polyfill (exposes
-  // `browser`) without spinning up the React popup/options UI or depending on
-  // the background being ready.
-  // FIREFOX NOTE: Playwright's patched Firefox build does not commit
-  // top-level navigation to moz-extension:// URLs reliably. The UUID can be
-  // read from per-profile prefs.js but page.goto() to any extension page
-  // (options, popup, offscreen) hangs at the commit step. Specs run on the
-  // chrome-mv3 project; the firefox-mv3 project is wired but the test bodies
-  // bail out at extensionPage setup. Tracking as upstream playwright /
-  // playwright-webextext concern.
+  // Vantage page from which tests interact with the extension.
+  //
+  // Chrome: a real extension page at chrome-extension://<id>/offscreen/.
+  // Inside it, `browser.runtime.sendMessage` reaches the SW directly.
+  //
+  // Firefox: Playwright cannot navigate to moz-extension URLs nor reach the
+  // MV3 event page, so we navigate to the local bridge URL instead. The
+  // content script declared in the patched FF manifest forwards window
+  // postMessage requests to chrome.runtime.sendMessage. helpers/session.js
+  // detects this and routes accordingly.
   extensionPage: async ({ context, extensionId }, use, testInfo) => {
     const { browserType } = testInfo.project.use;
-    const scheme = browserType === "firefox" ? "moz-extension" : "chrome-extension";
     const page = await context.newPage();
     page.on("pageerror", err => console.log(`[page error] ${err.message}`));
-    await page.goto(`${scheme}://${extensionId}/options/index.html`, {
-      waitUntil: "commit",
-      timeout: 10000
-    });
-    await page.waitForFunction(
-      () => typeof browser !== "undefined" && browser.runtime && browser.runtime.id,
-      { timeout: 15000 }
-    );
+
+    if (browserType === "firefox") {
+      const bridgeUrl = process.env.E2E_BRIDGE_URL;
+      if (!bridgeUrl) throw new Error("E2E_BRIDGE_URL not set; global-setup must start the bridge server");
+      console.log("[ff-bridge] navigating to", bridgeUrl);
+      const resp = await page
+        .goto(bridgeUrl, { waitUntil: "domcontentloaded", timeout: 10000 })
+        .catch(e => ({ error: e.message }));
+      console.log("[ff-bridge] goto result:", resp && resp.error ? resp.error : resp && resp.status ? resp.status() : resp);
+      await page
+        .waitForFunction(
+          () => document.documentElement.getAttribute("data-e2e-bridge") === "ready",
+          { timeout: 8000 }
+        )
+        .catch(e => {
+          throw new Error(`bridge readiness wait failed: ${e.message}`);
+        });
+      console.log("[ff-bridge] ready");
+    } else {
+      await page.goto(`chrome-extension://${extensionId}/offscreen/index.html`, {
+        waitUntil: "commit",
+        timeout: 10000
+      });
+      await page.waitForFunction(
+        () => typeof browser !== "undefined" && browser.runtime && browser.runtime.id,
+        { timeout: 15000 }
+      );
+    }
+
     await use(page);
     await page.close();
   }
@@ -78,10 +109,9 @@ async function getChromeExtensionId(context) {
   return new URL(sw.url()).host;
 }
 
-// Playwright Firefox does not fire the `backgroundpage` event for MV3 event
-// pages reliably, so derive the UUID from the per-profile prefs.js mapping.
-// Firefox writes `extensions.webextensions.uuids` keyed by gecko addon id once
-// the addon is registered.
+// FF UUID extraction from per-profile prefs.js. We don't navigate to
+// moz-extension URLs (see extensionPage comment) but tests that need the
+// URL — e.g. options-page-renders — still ask for it.
 async function getFirefoxExtensionId(context, userDataDir) {
   const prefsPath = path.join(userDataDir, "prefs.js");
   const deadline = Date.now() + 15000;
@@ -89,10 +119,6 @@ async function getFirefoxExtensionId(context, userDataDir) {
     const uuid = readUuidFromPrefs(prefsPath, FF_GECKO_ID);
     if (uuid) return uuid;
     await new Promise(r => setTimeout(r, 200));
-  }
-  // Fallback: any already-open moz-extension page can supply the UUID.
-  for (const p of context.pages()) {
-    if (p.url().startsWith("moz-extension://")) return new URL(p.url()).host;
   }
   throw new Error(`could not determine firefox extension id for ${FF_GECKO_ID}`);
 }

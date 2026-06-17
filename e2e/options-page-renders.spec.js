@@ -1,5 +1,7 @@
 const { test, expect } = require("./fixtures/extension");
 const { importSessions, buildSession } = require("./helpers/session");
+const { openExtensionPage } = require("./helpers/extension-tab");
+const { poll } = require("./helpers/poll");
 
 const ROUTES = [
   { hash: "", label: "default (sessions)" },
@@ -9,12 +11,16 @@ const ROUTES = [
   { hash: "#/information", label: "information" }
 ];
 
+async function waitForRootMounted(p) {
+  await poll(15000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
+}
+
 test("options page renders the React app and main scaffolding", async ({
   context,
   extensionId,
   extensionPage
-}) => {
-  // Seed a session so the sessions list isn't empty when options renders.
+}, testInfo) => {
+  const browserType = testInfo.project.use.browserType;
   await importSessions(extensionPage, [
     buildSession({
       id: "e2e-opts-seed",
@@ -24,16 +30,17 @@ test("options page renders the React app and main scaffolding", async ({
   ]);
   await extensionPage.waitForTimeout(300);
 
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/options/index.html`);
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForFunction(
-    () => document.querySelector("#root") && document.querySelector("#root").children.length > 0,
-    { timeout: 15000 }
-  );
-  const sidebarLinks = await page.$$eval('a[href^="#"]', els => els.length);
+  const p = await openExtensionPage({
+    context,
+    extensionId,
+    extensionPage,
+    browserType,
+    relPath: "options/index.html"
+  });
+  await waitForRootMounted(p);
+  const sidebarLinks = await p.helperCall("queryAllCount", ['a[href^="#"]']);
   expect(sidebarLinks).toBeGreaterThanOrEqual(2);
-  await page.close();
+  await p.close();
 });
 
 for (const { hash, label } of ROUTES) {
@@ -41,17 +48,19 @@ for (const { hash, label } of ROUTES) {
     context,
     extensionId,
     extensionPage
-  }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/options/index.html${hash}`);
-    await page.waitForFunction(
-      () => document.querySelector("#root") && document.querySelector("#root").children.length > 0,
-      { timeout: 15000 }
-    );
-    // Let the route component mount fully.
-    await page.waitForTimeout(800);
-    const bodyText = await page.evaluate(() => document.body.innerText.length);
-    expect(bodyText).toBeGreaterThan(0);
-    await page.close();
+  }, testInfo) => {
+    const browserType = testInfo.project.use.browserType;
+    const p = await openExtensionPage({
+      context,
+      extensionId,
+      extensionPage,
+      browserType,
+      relPath: `options/index.html${hash}`
+    });
+    await waitForRootMounted(p);
+    await p.waitForTimeout(800);
+    const bodyLen = await p.helperCall("bodyTextLength");
+    expect(bodyLen).toBeGreaterThan(0);
+    await p.close();
   });
 }

@@ -9,6 +9,14 @@ test("exportSessions triggers a download for an imported session", async ({
   context,
   extensionPage
 }) => {
+  test.setTimeout(60000);
+
+  // Listen for downloads — accept them as they fire so FF does not hold the
+  // context open waiting for a user gesture.
+  context.on("download", download => {
+    download.saveAs(`/tmp/tsm-e2e-${download.suggestedFilename()}`).catch(() => {});
+  });
+
   const session = buildSession({
     id: "e2e-export",
     name: "export-target",
@@ -17,8 +25,6 @@ test("exportSessions triggers a download for an imported session", async ({
   await importSessions(extensionPage, [session]);
   await extensionPage.waitForTimeout(400);
 
-  // Don't assert on the download path itself (browser download dialog in
-  // headless mode is awkward). Just kick the message and let the code run.
   await sendMessage(extensionPage, {
     message: "exportSessions",
     id: session.id

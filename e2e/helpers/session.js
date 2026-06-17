@@ -78,7 +78,6 @@ async function setSettings(page, patch) {
     const existing = (await browser.storage.local.get("Settings")).Settings || {};
     await browser.storage.local.set({ Settings: { ...existing, ...newSettings } });
   }, patch);
-  // storage.onChanged → handleSettingsChange refresh window.
   await page.waitForTimeout(500);
 }
 

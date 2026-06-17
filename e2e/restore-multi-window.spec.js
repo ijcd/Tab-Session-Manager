@@ -18,14 +18,18 @@ test("restoring a multi-window session opens both windows with their tabs", asyn
   await openSession(extensionPage, session);
   const newWindowIds = await waitForNNewWindows(extensionPage, baseline, 2);
 
-  const allUrls = new Set();
-  // We expect at least 2 loaded tabs per window — pick the lower count window
-  // since waitForTabsLoaded asserts a minimum and we just want to catch them
-  // all once they're in.
-  for (const wid of newWindowIds) {
-    const tabs = await waitForTabsLoaded(extensionPage, wid, 2);
-    for (const t of tabs) allUrls.add(t.url);
-  }
+  // Poll until every expected URL has loaded across the new windows. FF
+  // restores tabs slower than Chrome and the 2-per-window minimum misses
+  // the third tab in window 2.
+  const { poll } = require("./helpers/poll");
+  const allUrls = await poll(20000, 250, async () => {
+    const urls = new Set();
+    for (const wid of newWindowIds) {
+      const tabs = await waitForTabsLoaded(extensionPage, wid, 2);
+      for (const t of tabs) urls.add(t.url);
+    }
+    return urls.size >= 5 ? urls : undefined;
+  });
 
   expect([...allUrls].sort()).toEqual([
     "https://example.com/w1a",
