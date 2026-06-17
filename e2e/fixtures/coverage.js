@@ -8,17 +8,52 @@ if (process.env.COVERAGE === "1") {
   fs.mkdirSync(NYC_OUTPUT_DIR, { recursive: true });
 }
 
-// Captures self.__coverage__ from every service worker in the context and
-// window.__coverage__ from every open extension page, writing each as a
-// separate JSON blob into .nyc_output/. nyc merges them when reporting.
+function writeBlob(cov) {
+  if (!cov || Object.keys(cov).length === 0) return;
+  const id = crypto.randomBytes(8).toString("hex");
+  fs.writeFileSync(path.join(NYC_OUTPUT_DIR, `${id}.json`), JSON.stringify(cov));
+}
+
+// Attaches per-page coverage capture as pages are created — dumps
+// window.__coverage__ just before the page closes (otherwise the tests'
+// p.close() before fixture teardown loses the page's coverage). Also
+// captures SW + open-page coverage at teardown.
+function attachCoverageCapture(context) {
+  if (process.env.COVERAGE !== "1") return;
+  context.on("page", page => {
+    const dump = async () => {
+      if (page.isClosed()) return;
+      const url = page.url();
+      if (!url.startsWith("chrome-extension://") && !url.startsWith("moz-extension://")) return;
+      try {
+        const cov = await page.evaluate(() => window.__coverage__);
+        writeBlob(cov);
+      } catch {}
+    };
+    page.on("close", () => {
+      // page already closing; nothing to evaluate. Coverage was captured
+      // by the periodic flush below.
+    });
+    // Periodically flush coverage so we capture even pages that close
+    // abruptly before our pre-close hook can fire.
+    const interval = setInterval(() => {
+      dump().catch(() => {});
+    }, 1500);
+    page.on("close", () => clearInterval(interval));
+  });
+}
+
 async function dumpCoverage(context) {
   if (process.env.COVERAGE !== "1") return 0;
-  const blobs = [];
+  let count = 0;
 
   for (const sw of context.serviceWorkers()) {
     try {
       const cov = await sw.evaluate(() => self.__coverage__);
-      if (cov && Object.keys(cov).length > 0) blobs.push(cov);
+      if (cov && Object.keys(cov).length > 0) {
+        writeBlob(cov);
+        count++;
+      }
     } catch {}
   }
 
@@ -28,15 +63,13 @@ async function dumpCoverage(context) {
     if (!url.startsWith("chrome-extension://") && !url.startsWith("moz-extension://")) continue;
     try {
       const cov = await page.evaluate(() => window.__coverage__);
-      if (cov && Object.keys(cov).length > 0) blobs.push(cov);
+      if (cov && Object.keys(cov).length > 0) {
+        writeBlob(cov);
+        count++;
+      }
     } catch {}
   }
-
-  for (const cov of blobs) {
-    const id = crypto.randomBytes(8).toString("hex");
-    fs.writeFileSync(path.join(NYC_OUTPUT_DIR, `${id}.json`), JSON.stringify(cov));
-  }
-  return blobs.length;
+  return count;
 }
 
-module.exports = { dumpCoverage };
+module.exports = { attachCoverageCapture, dumpCoverage };
