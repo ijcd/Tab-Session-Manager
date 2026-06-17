@@ -1,0 +1,12 @@
+{
+  "all": false,
+  "include": ["src/**/*.js", "src/**/*.jsx"],
+  "exclude": [
+    "src/credentials.js",
+    "src/_locales/**",
+    "src/icons/**"
+  ],
+  "reporter": ["text-summary", "html", "lcov"],
+  "report-dir": "coverage",
+  "temp-dir": ".nyc_output"
+}

@@ -4,6 +4,7 @@ const { withExtension } = require("playwright-webextext");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { dumpCoverage } = require("./coverage");
 
 const FF_GECKO_ID = "Tab-Session-Manager@sienori";
 
@@ -25,6 +26,11 @@ const test = base.extend({
       : { headless: true, channel: "chromium" };
     const context = await wrapped.launchPersistentContext(userDataDir, launchOptions);
     await use(context);
+    try {
+      await dumpCoverage(context);
+    } catch (e) {
+      console.error("[coverage] dump failed:", e.message);
+    }
     await context.close();
   },
 
