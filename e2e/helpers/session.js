@@ -71,14 +71,36 @@ function buildSession({ id = "e2e-session", name = "e2e session", windows = [] }
 // Wake the background SW and ensure init() runs, then merge a Settings patch
 // into storage. TSM keeps all settings under one "Settings" key.
 async function setSettings(page, patch) {
+  // Wake the SW and ensure init() has run before we read/write Settings.
+  // TSM's init() populates defaults into the Settings storage key on
+  // first run; without waiting for it, our patch can be overwritten by
+  // the defaults that init writes afterwards.
   await page.evaluate(async () => {
     await browser.runtime.sendMessage({ message: "getInitState" });
+  });
+  // Poll until the SW has populated defaults for the keys we are about
+  // to patch — confirms init() finished.
+  const { poll } = require("./poll");
+  await poll(8000, 200, async () => {
+    const present = await page.evaluate(async () => {
+      return (await browser.storage.local.get("Settings")).Settings ? true : false;
+    });
+    return present ? true : undefined;
   });
   await page.evaluate(async newSettings => {
     const existing = (await browser.storage.local.get("Settings")).Settings || {};
     await browser.storage.local.set({ Settings: { ...existing, ...newSettings } });
   }, patch);
-  await page.waitForTimeout(500);
+  // Verify the storage write took effect AND wait for storage.onChanged
+  // → handleSettingsChange to refresh the in-memory currentSettings.
+  await poll(8000, 100, async () => {
+    const ok = await page.evaluate(async expected => {
+      const s = (await browser.storage.local.get("Settings")).Settings || {};
+      return Object.entries(expected).every(([k, v]) => s[k] === v);
+    }, patch);
+    return ok ? true : undefined;
+  });
+  await page.waitForTimeout(300);
 }
 
 async function sendMessage(page, message) {
