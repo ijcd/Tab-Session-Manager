@@ -5,50 +5,19 @@ const { getAllWindowIds, waitForNewWindow, waitForTabsLoaded } = require("./help
 test("restore preserves pinned and active tab flags", async ({ extensionPage }) => {
   await setSettings(extensionPage, { ifLazyLoading: false });
 
-  // Build a session by hand because the helper's default flags don't include
-  // pinned. Two tabs: tab 0 pinned, tab 1 active.
-  const session = {
+  const session = buildSession({
     id: "e2e-tab-props",
     name: "tab-props",
-    date: Date.now(),
-    lastEditedTime: Date.now(),
-    tag: [],
-    sessionStartTime: Date.now(),
-    windows: {
-      1: {
-        101: {
-          id: 101,
-          windowId: 1,
-          index: 0,
-          url: "https://example.com/pinned",
-          title: "pinned",
-          active: false,
-          pinned: true,
-          incognito: false,
-          groupId: -1,
-          cookieStoreId: "firefox-default"
-        },
-        102: {
-          id: 102,
-          windowId: 1,
-          index: 1,
-          url: "https://example.com/active",
-          title: "active",
-          active: true,
-          pinned: false,
-          incognito: false,
-          groupId: -1,
-          cookieStoreId: "firefox-default"
+    windows: [
+      {
+        urls: ["https://example.com/pinned", "https://example.com/active"],
+        tabOverrides: {
+          0: { pinned: true, active: false },
+          1: { pinned: false, active: true }
         }
       }
-    },
-    windowsNumber: 1,
-    windowsInfo: {
-      1: { id: 1, type: "normal", state: "normal", incognito: false }
-    },
-    tabsNumber: 2,
-    tabGroups: []
-  };
+    ]
+  });
 
   const baseline = (await getAllWindowIds(extensionPage)).sort();
   await openSession(extensionPage, session);

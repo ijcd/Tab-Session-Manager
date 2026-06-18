@@ -1,11 +1,6 @@
 const { test, expect } = require("./fixtures/extension");
-const { openExtensionPage } = require("./helpers/extension-tab");
+const { openExtensionPage, waitForRootMounted } = require("./helpers/extension-tab");
 const { importSessions, buildSession } = require("./helpers/session");
-const { poll } = require("./helpers/poll");
-
-async function waitForMounted(p) {
-  await poll(20000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
-}
 
 test("popup lists imported sessions", async ({
   context,
@@ -31,11 +26,14 @@ test("popup lists imported sessions", async ({
     browserType,
     relPath: "popup/index.html"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(1500);
 
   // Body text should at least mention one session name.
-  const has = await p.helperCall("selectorTextContains", ["body", "popup-list-"]);
+  const has = await p.helperCall("selectorTextContains", {
+    selector: "body",
+    needle: "popup-list-"
+  });
   if (!has) {
     const bodyLen = await p.helperCall("bodyTextLength");
     expect(bodyLen).toBeGreaterThan(50);
@@ -57,13 +55,13 @@ test("popup clicking buttons exercises action handlers", async ({
     browserType,
     relPath: "popup/index.html"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(1500);
-  const btnCount = await p.helperCall("queryAllCount", ["button"]);
+  const btnCount = await p.helperCall("queryAllCount", "button");
   expect(btnCount).toBeGreaterThanOrEqual(0);
   // Click a few buttons; we don't care about success — coverage is the goal.
   for (let i = 0; i < Math.min(btnCount, 3); i++) {
-    await p.helperCall("clickFirst", [`button:nth-of-type(${i + 1})`]);
+    await p.helperCall("clickFirst", `button:nth-of-type(${i + 1})`);
     await p.waitForTimeout(150);
   }
   await p.close();

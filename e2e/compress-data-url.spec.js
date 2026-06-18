@@ -2,9 +2,7 @@ const { test, expect } = require("./fixtures/extension");
 const {
   saveCurrentSession,
   setSettings,
-  getAllSessions
-} = require("./helpers/session");
-const { poll } = require("./helpers/poll");
+  getAllSessions, waitForSessionByName } = require("./helpers/session");
 
 // Drive compressFaviconUrl path which uses common/compressDataUrl.js.
 
@@ -24,8 +22,5 @@ test("saveCurrentSession with compressFaviconUrl exercises compressDataUrl", asy
   await extensionPage.waitForTimeout(1000);
 
   await saveCurrentSession(extensionPage, "compress-test");
-  await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "compress-test");
-  });
+  await waitForSessionByName(extensionPage, "compress-test");
 });

@@ -7,9 +7,10 @@
 // open the page via browser.tabs.create, then run pre-bundled DOM helpers
 // inside the tab via chrome.scripting.executeScript routed through the
 // __e2e_runHelper path on the BG bridge. MV3 CSP forbids new Function /
-// eval, so the helper set is a fixed registry defined in bg-exec-shim.js.
+// eval, so the helper set is a fixed registry — see helpers/page-helpers.js.
 
 const { poll } = require("./poll");
+const { PAGE_HELPERS } = require("./page-helpers");
 
 async function openExtensionPage({
   context,
@@ -33,66 +34,17 @@ function wrapChromePage(page) {
   return {
     isFirefoxShim: false,
     page,
-    waitForFunction: (fn, opts) => page.waitForFunction(fn, opts),
     waitForTimeout: ms => page.waitForTimeout(ms),
-    evaluate: (...args) => page.evaluate(...args),
-    $$eval: (sel, fn, ...args) => page.$$eval(sel, fn, ...args),
-    helperCall: async (name, args = []) => {
-      // Chrome path runs the helper directly in the page (no CSP issues
-      // because extension pages can call functions normally).
-      const evalMap = {
-        rootMounted: () => {
-          const r = document.querySelector("#root");
-          return !!(r && r.children && r.children.length > 0);
-        },
-        bodyTextLength: () =>
-          document.body && document.body.innerText
-            ? document.body.innerText.length
-            : 0,
-        queryAllCount: sel => document.querySelectorAll(sel).length,
-        clickFirst: sel => {
-          const el = document.querySelector(sel);
-          if (!el) return false;
-          el.click();
-          return true;
-        },
-        clickFirstByText: (sel, text) => {
-          const els = document.querySelectorAll(sel);
-          for (const el of els) {
-            if ((el.innerText || "").indexOf(text) >= 0) {
-              el.click();
-              return true;
-            }
-          }
-          return false;
-        },
-        setHash: hash => {
-          window.location.hash = hash;
-          return window.location.hash;
-        },
-        getHash: () => window.location.hash,
-        selectorTextContains: (sel, needle) => {
-          const el = document.querySelector(sel);
-          if (!el) return false;
-          return (el.innerText || "").indexOf(needle) >= 0;
-        }
-      };
-      return page.evaluate(({ fnSrc, a }) => {
-        // eslint-disable-next-line no-new-func
-        return new Function("return (" + fnSrc + ")")()(...a);
-      }, { fnSrc: evalMap[name].toString(), a: args });
+    helperCall: (name, arg) => {
+      const fn = PAGE_HELPERS[name];
+      if (!fn) throw new Error(`unknown helper: ${name}`);
+      // Playwright serializes fn.toString() internally and runs it in
+      // the page. arg is structured-cloned through as the single
+      // page-side argument (undefined if not supplied).
+      return page.evaluate(fn, arg);
     },
     close: () => page.close()
   };
-}
-
-async function callHelperInFirefoxTab(extensionPage, tabId, name, args = []) {
-  return extensionPage.evaluate(
-    async ({ tid, helperName, helperArgs }) => {
-      return await browser.__e2e_runHelper(tid, helperName, helperArgs);
-    },
-    { tid: tabId, helperName: name, helperArgs: args }
-  );
 }
 
 async function openFirefoxExtensionPage({ extensionPage, relPath }) {
@@ -114,13 +66,13 @@ async function openFirefoxExtensionPage({ extensionPage, relPath }) {
   return {
     isFirefoxShim: true,
     tabId,
-    helperCall: (name, args = []) => callHelperInFirefoxTab(extensionPage, tabId, name, args),
-    waitForFunction: async (_fn, opts = {}) => {
-      // FF specs use named helpers, not closures — see helperCall. This
-      // method exists for spec interface symmetry only and should not be
-      // called on the FF shim.
-      throw new Error("Use helperCall on the FF shim, not waitForFunction");
-    },
+    helperCall: (name, arg) =>
+      extensionPage.evaluate(
+        async ({ tid, helperName, helperArg }) => {
+          return await browser.__e2e_runHelper(tid, helperName, [helperArg]);
+        },
+        { tid: tabId, helperName: name, helperArg: arg }
+      ),
     waitForTimeout: ms => extensionPage.waitForTimeout(ms),
     close: async () => {
       await extensionPage
@@ -134,4 +86,11 @@ async function openFirefoxExtensionPage({ extensionPage, relPath }) {
   };
 }
 
-module.exports = { openExtensionPage };
+// Poll until the React root in the opened extension page has children.
+async function waitForRootMounted(p, timeoutMs = 20000) {
+  await poll(timeoutMs, 200, async () =>
+    (await p.helperCall("rootMounted")) ? true : undefined
+  );
+}
+
+module.exports = { openExtensionPage, waitForRootMounted };

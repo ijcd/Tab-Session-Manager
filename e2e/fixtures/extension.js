@@ -8,6 +8,26 @@ const { dumpCoverage, attachCoverageCapture } = require("./coverage");
 
 const FF_GECKO_ID = "Tab-Session-Manager@sienori";
 
+// Browser-specific launchPersistentContext options. With the omni.ja
+// Juggler patch (see e2e/juggler-patch/), FF runs headless cleanly.
+const LAUNCH_OPTIONS = {
+  chromium: () => ({ headless: true, channel: "chromium" }),
+  firefox: () => ({
+    headless: true,
+    acceptDownloads: true,
+    // Auto-accept downloads to a temp dir so the FF "save file" dialog
+    // does not hang context teardown when a test triggers
+    // browser.downloads.download.
+    downloadsPath: fs.mkdtempSync(path.join(os.tmpdir(), "tsm-dl-")),
+    firefoxUserPrefs: {
+      "browser.download.folderList": 2,
+      "browser.download.manager.showWhenStarting": false,
+      "browser.helperApps.neverAsk.saveToDisk":
+        "application/json,text/plain,application/octet-stream"
+    }
+  })
+};
+
 const test = base.extend({
   userDataDir: async ({}, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tsm-e2e-"));
@@ -19,40 +39,15 @@ const test = base.extend({
     const { browserType, extensionPath } = testInfo.project.use;
     const baseType = browserType === "firefox" ? firefox : chromium;
     const wrapped = withExtension(baseType, extensionPath);
-    // Chromium supports headless extensions via channel: "chromium"
-    // (Playwright >=1.46). Firefox still requires headed.
-    const launchOptions = browserType === "firefox"
-      ? {
-          // With the patched Juggler in Nightly's omni.ja (closes the
-          // extra-tab spawned by temp addon install before its "expected
-          // exactly 1 tab" assertion), FF can run headless with extensions.
-          headless: true,
-          acceptDownloads: true,
-          // Auto-accept downloads to a temp dir so the FF "save file"
-          // dialog does not hang context teardown when a test triggers
-          // browser.downloads.download.
-          downloadsPath: fs.mkdtempSync(path.join(os.tmpdir(), "tsm-dl-")),
-          firefoxUserPrefs: {
-            "browser.download.folderList": 2,
-            "browser.download.manager.showWhenStarting": false,
-            "browser.helperApps.neverAsk.saveToDisk": "application/json,text/plain,application/octet-stream",
-            // Open the test window off the visible screen so it does not
-            // steal focus on dev machines. Negative coords are clamped
-            // back on macOS, so use a far-right offset that lands on a
-            // typical non-existent virtual display.
-            "browser.window.x": 5000,
-            "browser.window.y": 5000,
-            "browser.startup.page": 0
-          },
-          args: ["-width", "100", "-height", "100"]
-        }
-      : { headless: true, channel: "chromium" };
-    const context = await wrapped.launchPersistentContext(userDataDir, launchOptions);
+    const optionsFn = LAUNCH_OPTIONS[browserType] || LAUNCH_OPTIONS.chromium;
+    const context = await wrapped.launchPersistentContext(userDataDir, optionsFn());
     attachCoverageCapture(context);
     await use(context);
     try {
       await dumpCoverage(context);
     } catch (e) {
+      // Coverage dump errors should not fail tests — but they must be
+      // visible so a regression in the capture path is noticed.
       console.error("[coverage] dump failed:", e.message);
     }
     await context.close();
@@ -70,35 +65,24 @@ const test = base.extend({
   // Vantage page from which tests interact with the extension.
   //
   // Chrome: a real extension page at chrome-extension://<id>/offscreen/.
-  // Inside it, `browser.runtime.sendMessage` reaches the SW directly.
+  //   Inside it, `browser.runtime.sendMessage` reaches the SW directly.
   //
-  // Firefox: Playwright cannot navigate to moz-extension URLs nor reach the
-  // MV3 event page, so we navigate to the local bridge URL instead. The
-  // content script declared in the patched FF manifest forwards window
-  // postMessage requests to chrome.runtime.sendMessage. helpers/session.js
-  // detects this and routes accordingly.
+  // Firefox: Playwright cannot navigate to moz-extension URLs nor reach
+  //   the MV3 event page, so we navigate to the local bridge URL instead.
+  //   See helpers/bridge-content-script.js + bg-exec-shim.js.
   extensionPage: async ({ context, extensionId }, use, testInfo) => {
     const { browserType } = testInfo.project.use;
     const page = await context.newPage();
-    page.on("pageerror", err => console.log(`[page error] ${err.message}`));
-
     if (browserType === "firefox") {
       const bridgeUrl = process.env.E2E_BRIDGE_URL;
-      if (!bridgeUrl) throw new Error("E2E_BRIDGE_URL not set; global-setup must start the bridge server");
-      console.log("[ff-bridge] navigating to", bridgeUrl);
-      const resp = await page
-        .goto(bridgeUrl, { waitUntil: "domcontentloaded", timeout: 10000 })
-        .catch(e => ({ error: e.message }));
-      console.log("[ff-bridge] goto result:", resp && resp.error ? resp.error : resp && resp.status ? resp.status() : resp);
-      await page
-        .waitForFunction(
-          () => document.documentElement.getAttribute("data-e2e-bridge") === "ready",
-          { timeout: 8000 }
-        )
-        .catch(e => {
-          throw new Error(`bridge readiness wait failed: ${e.message}`);
-        });
-      console.log("[ff-bridge] ready");
+      if (!bridgeUrl) {
+        throw new Error("E2E_BRIDGE_URL not set; global-setup must start the bridge server");
+      }
+      await page.goto(bridgeUrl, { waitUntil: "domcontentloaded", timeout: 10000 });
+      await page.waitForFunction(
+        () => document.documentElement.getAttribute("data-e2e-bridge") === "ready",
+        { timeout: 8000 }
+      );
     } else {
       await page.goto(`chrome-extension://${extensionId}/offscreen/index.html`, {
         waitUntil: "commit",
@@ -121,9 +105,8 @@ async function getChromeExtensionId(context) {
   return new URL(sw.url()).host;
 }
 
-// FF UUID extraction from per-profile prefs.js. We don't navigate to
-// moz-extension URLs (see extensionPage comment) but tests that need the
-// URL — e.g. options-page-renders — still ask for it.
+// FF UUID extraction from per-profile prefs.js. We can't navigate to
+// moz-extension URLs but some specs still need the UUID for sanity.
 async function getFirefoxExtensionId(context, userDataDir) {
   const prefsPath = path.join(userDataDir, "prefs.js");
   const deadline = Date.now() + 15000;

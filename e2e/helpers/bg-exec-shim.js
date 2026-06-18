@@ -1,17 +1,17 @@
-// Appended to the FF background bundle by global-setup. Accepts long-lived
-// chrome.runtime.onConnect ports from the content-script bridge with name
-// "__e2e_exec__" and executes chrome.* paths against the background's full
-// API surface. Port-based communication does not compete with TSM's
-// onMessage listeners for the single sendMessage response slot.
+// Appended to the FF background bundle by global-setup, AFTER the
+// PAGE_HELPERS registry (helpers/page-helpers.js) is concatenated in.
 //
-// Special path "__e2e_runHelper" runs a named pre-bundled helper inside a
-// tab via chrome.scripting.executeScript. MV3 CSP forbids new Function /
-// eval in extension contexts, so we don't reconstruct dynamic source; the
-// FF harness uses this registry to query DOM state in moz-extension pages
-// that Playwright cannot evaluate against directly.
+// Accepts long-lived chrome.runtime.onConnect ports from the content-
+// script bridge with name "__e2e_exec__" and executes chrome.* paths
+// against the background's full API surface. Port-based communication
+// does not compete with TSM's onMessage listeners for the single
+// sendMessage response slot.
+//
+// Special path "__e2e_runHelper" runs a named PAGE_HELPERS function
+// inside a tab via chrome.scripting.executeScript.
 
 (function () {
-  const api =
+  var api =
     typeof browser !== "undefined" && browser.runtime
       ? browser
       : typeof chrome !== "undefined" && chrome.runtime
@@ -19,80 +19,50 @@
       : null;
   if (!api || !api.runtime.onConnect) return;
 
-  const HELPERS = {
-    rootMounted: function () {
-      const root = document.querySelector("#root");
-      return !!(root && root.children && root.children.length > 0);
-    },
-    bodyTextLength: function () {
-      return (document.body && document.body.innerText ? document.body.innerText.length : 0);
-    },
-    queryAllCount: function (selector) {
-      return document.querySelectorAll(selector).length;
-    },
-    clickFirst: function (selector) {
-      var el = document.querySelector(selector);
-      if (!el) return false;
-      el.click();
-      return true;
-    },
-    clickFirstByText: function (selector, text) {
-      var els = document.querySelectorAll(selector);
-      for (var i = 0; i < els.length; i++) {
-        if ((els[i].innerText || "").indexOf(text) >= 0) {
-          els[i].click();
-          return true;
-        }
-      }
-      return false;
-    },
-    setHash: function (hash) {
-      window.location.hash = hash;
-      return window.location.hash;
-    },
-    getHash: function () {
-      return window.location.hash;
-    },
-    selectorTextContains: function (selector, needle) {
-      var el = document.querySelector(selector);
-      if (!el) return false;
-      return (el.innerText || "").indexOf(needle) >= 0;
-    }
-  };
+  // PAGE_HELPERS is defined by the helpers/page-helpers.js source
+  // global-setup concatenates ahead of this file.
+  var helpers = typeof PAGE_HELPERS !== "undefined" ? PAGE_HELPERS : {};
 
   api.runtime.onConnect.addListener(function (port) {
     if (port.name !== "__e2e_exec__") return;
     port.onMessage.addListener(async function (request) {
-      const id = request && request.id;
+      var id = request && request.id;
       try {
-        const path = (request && request.path) || [];
-        const args = (request && request.args) || [];
+        var path = (request && request.path) || [];
+        var args = (request && request.args) || [];
 
         if (path.length === 1 && path[0] === "__e2e_runHelper") {
-          const tabId = args[0];
-          const helperName = args[1];
-          const helperArgs = args[2] || [];
-          const fn = HELPERS[helperName];
+          var tabId = args[0];
+          var helperName = args[1];
+          var helperArgs = args[2] || [];
+          var fn = helpers[helperName];
           if (!fn) {
             port.postMessage({
               id,
               ok: false,
-              error: "unknown helper: " + helperName + ". registered: " + Object.keys(HELPERS).join(",")
+              error:
+                "unknown helper: " + helperName + ". registered: " +
+                Object.keys(helpers).join(",")
             });
             return;
           }
-          const res = await api.scripting.executeScript({
+          var res = await api.scripting.executeScript({
             target: { tabId },
             func: fn,
             args: helperArgs
           });
-          port.postMessage({ id, ok: true, result: res && res[0] ? res[0].result : undefined });
+          port.postMessage({
+            id,
+            ok: true,
+            result: res && res[0] ? res[0].result : undefined
+          });
           return;
         }
 
-        let parent = self;
-        let target = api;
-        for (const segment of path) {
+        var parent = self;
+        var target = api;
+        for (var i = 0; i < path.length; i++) {
+          var segment = path[i];
           parent = target;
           target = target[segment];
           if (target === undefined) {
@@ -112,7 +82,7 @@
           });
           return;
         }
-        const result = await target.apply(parent, args);
+        var result = await target.apply(parent, args);
         port.postMessage({ id, ok: true, result });
       } catch (e) {
         port.postMessage({

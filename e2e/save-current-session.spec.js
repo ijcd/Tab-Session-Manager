@@ -1,9 +1,7 @@
 const { test, expect } = require("./fixtures/extension");
 const {
   saveCurrentSession,
-  getAllSessions
-} = require("./helpers/session");
-const { poll } = require("./helpers/poll");
+  getAllSessions, waitForSessionByName } = require("./helpers/session");
 
 test("saveCurrentSession persists the live tabs into a session record", async ({
   context,
@@ -22,10 +20,7 @@ test("saveCurrentSession persists the live tabs into a session record", async ({
   await saveCurrentSession(extensionPage, "captured-session");
 
   // sessions.put is async; poll until the new session shows up.
-  const saved = await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "captured-session");
-  });
+  const saved = await waitForSessionByName(extensionPage, "captured-session");
 
   expect(saved).toBeTruthy();
   expect(saved.tabsNumber).toBeGreaterThanOrEqual(3);

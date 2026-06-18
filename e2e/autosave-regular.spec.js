@@ -1,21 +1,21 @@
 const { test, expect } = require("./fixtures/extension");
 const {
   setSettings,
-  getAllSessions
+  getAllSessions,
+  fireAlarm
 } = require("./helpers/session");
 const { poll } = require("./helpers/poll");
 
-// Force the regular autosave alarm to fire by setting a very short interval
-// and waiting for the autoSaveRegular path.
-
-test("autoSaveRegular fires when alarm period elapses", async ({
+test("autoSaveRegular fires and lands a 'regular'-tagged session", async ({
   extensionPage,
   context
 }) => {
   test.setTimeout(60000);
   await setSettings(extensionPage, {
     ifAutoSave: true,
-    autoSaveInterval: 0.05, // 3 seconds
+    // 0.05 minutes = 3 seconds. Alarm is then re-fired manually via
+    // fireAlarm to avoid waiting on Chrome's alarm scheduler.
+    autoSaveInterval: 0.05,
     autoSaveLimit: 10,
     ifLazyLoading: false
   });
@@ -26,23 +26,12 @@ test("autoSaveRegular fires when alarm period elapses", async ({
   });
   await extensionPage.waitForTimeout(800);
 
-  // Manually trigger the autoSaveRegular alarm so autoSave.js executes.
-  const [sw] = context.serviceWorkers();
-  if (sw) {
-    await sw.evaluate(async () => {
-      try {
-        await chrome.alarms.clear("autoSaveRegular");
-        chrome.alarms.create("autoSaveRegular", { delayInMinutes: 0.01 });
-      } catch {}
-    });
-  }
-  await extensionPage.waitForTimeout(5000);
+  await fireAlarm(context, "autoSaveRegular");
 
-  const all = await getAllSessions(extensionPage);
-  const regular = all.find(s => Array.isArray(s.tag) && s.tag.includes("regular"));
-  // Don't assert presence — if the SW didn't wake fast enough the test
-  // still exercises the alarm + handler code path on the next call.
-  if (regular) {
-    expect(regular.tabsNumber).toBeGreaterThan(0);
-  }
+  const regular = await poll(15000, 500, async () => {
+    const all = await getAllSessions(extensionPage);
+    return all.find(s => Array.isArray(s.tag) && s.tag.includes("regular"));
+  });
+  expect(regular).toBeTruthy();
+  expect(regular.tabsNumber).toBeGreaterThan(0);
 });

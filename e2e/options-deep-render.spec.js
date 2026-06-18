@@ -1,11 +1,6 @@
 const { test, expect } = require("./fixtures/extension");
-const { openExtensionPage } = require("./helpers/extension-tab");
+const { openExtensionPage, waitForRootMounted } = require("./helpers/extension-tab");
 const { importSessions, buildSession } = require("./helpers/session");
-const { poll } = require("./helpers/poll");
-
-async function waitForMounted(p) {
-  await poll(20000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
-}
 
 const ROUTES_DEEP = [
   "#/sessions",
@@ -36,19 +31,25 @@ test("options page exercises every setting category", async ({
     browserType,
     relPath: "options/index.html#/settings"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(800);
 
   // Click every category header / collapsible to render each category
   // body, exercising OptionContainer + each option's render path.
-  const categoryHeaders = await p.helperCall("queryAllCount", ['.categoryHeader, .categoryTitle, h2, h3']);
+  const categoryHeaders = await p.helperCall(
+    "queryAllCount",
+    ".categoryHeader, .categoryTitle, h2, h3"
+  );
   for (let i = 0; i < Math.min(categoryHeaders, 10); i++) {
-    await p.helperCall("clickFirst", [`.categoryHeader:nth-of-type(${i + 1}), h2:nth-of-type(${i + 1})`]);
+    await p.helperCall(
+      "clickFirst",
+      `.categoryHeader:nth-of-type(${i + 1}), h2:nth-of-type(${i + 1})`
+    );
     await p.waitForTimeout(100);
   }
 
   // Click each top-level button / input to fire change handlers.
-  const buttonCount = await p.helperCall("queryAllCount", ['button']);
+  const buttonCount = await p.helperCall("queryAllCount", 'button');
   expect(buttonCount).toBeGreaterThanOrEqual(0);
 
   await p.close();
@@ -76,10 +77,13 @@ test("options sessions page renders the imported session", async ({
     browserType,
     relPath: "options/index.html#/sessions"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(1500);
 
-  const hasName = await p.helperCall("selectorTextContains", ["body", "render-target-session"]);
+  const hasName = await p.helperCall("selectorTextContains", {
+    selector: "body",
+    needle: "render-target-session"
+  });
   // Some renderings strip names — accept either presence or large body text as a render proof.
   if (!hasName) {
     const bodyLen = await p.helperCall("bodyTextLength");
@@ -102,7 +106,7 @@ test("options information page mounts and shows version info", async ({
     browserType,
     relPath: "options/index.html#/information"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(800);
   const bodyLen = await p.helperCall("bodyTextLength");
   expect(bodyLen).toBeGreaterThan(0);
@@ -123,7 +127,7 @@ test("options shortcuts page mounts", async ({
     browserType,
     relPath: "options/index.html#/shortcuts"
   });
-  await waitForMounted(p);
+  await waitForRootMounted(p);
   await p.waitForTimeout(800);
   const bodyLen = await p.helperCall("bodyTextLength");
   expect(bodyLen).toBeGreaterThan(0);

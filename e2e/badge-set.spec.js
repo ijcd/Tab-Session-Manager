@@ -4,9 +4,7 @@ const {
   importSessions,
   saveCurrentSession,
   setSettings,
-  getAllSessions
-} = require("./helpers/session");
-const { poll } = require("./helpers/poll");
+  getAllSessions, waitForSessionByName } = require("./helpers/session");
 
 // Exercise setBadge.js which fires on session-count changes / save.
 
@@ -34,8 +32,5 @@ test("saving multiple sessions exercises badge updates", async ({ extensionPage 
   });
   await extensionPage.waitForTimeout(500);
   await saveCurrentSession(extensionPage, "badge-current");
-  await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "badge-current");
-  });
+  await waitForSessionByName(extensionPage, "badge-current");
 });

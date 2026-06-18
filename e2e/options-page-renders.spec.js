@@ -1,7 +1,6 @@
 const { test, expect } = require("./fixtures/extension");
 const { importSessions, buildSession } = require("./helpers/session");
-const { openExtensionPage } = require("./helpers/extension-tab");
-const { poll } = require("./helpers/poll");
+const { openExtensionPage, waitForRootMounted } = require("./helpers/extension-tab");
 
 const ROUTES = [
   { hash: "", label: "default (sessions)" },
@@ -10,10 +9,6 @@ const ROUTES = [
   { hash: "#/shortcuts", label: "shortcuts" },
   { hash: "#/information", label: "information" }
 ];
-
-async function waitForRootMounted(p) {
-  await poll(15000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
-}
 
 test("options page renders the React app and main scaffolding", async ({
   context,
@@ -38,7 +33,7 @@ test("options page renders the React app and main scaffolding", async ({
     relPath: "options/index.html"
   });
   await waitForRootMounted(p);
-  const sidebarLinks = await p.helperCall("queryAllCount", ['a[href^="#"]']);
+  const sidebarLinks = await p.helperCall("queryAllCount", 'a[href^="#"]');
   expect(sidebarLinks).toBeGreaterThanOrEqual(2);
   await p.close();
 });

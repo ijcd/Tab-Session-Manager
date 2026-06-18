@@ -2,6 +2,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { startBridgeServer } = require("./helpers/http-server");
+const { BRIDGE_PORT } = require("./helpers/constants");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEV = path.join(ROOT, "dev");
@@ -9,10 +10,7 @@ const FIXTURES = path.join(__dirname, ".fixtures");
 const CREDENTIALS = path.join(ROOT, "src", "credentials.js");
 const BRIDGE_CS_SRC = path.join(__dirname, "helpers", "bridge-content-script.js");
 const BG_EXEC_SHIM_SRC = path.join(__dirname, "helpers", "bg-exec-shim.js");
-
-// Bridge port used for the firefox-mv3 project. The CS injected via the
-// patched FF manifest connects the page main world to chrome.runtime.
-const BRIDGE_PORT = 38291;
+const PAGE_HELPERS_SRC = path.join(__dirname, "helpers", "page-helpers.js");
 
 module.exports = async () => {
   ensureCredentialsStub();
@@ -36,7 +34,6 @@ function ensureCredentialsStub() {
 }
 
 function runDevBuild() {
-  console.log("[e2e] webpack build-dev …");
   execFileSync("npm", ["run", "build-dev"], { cwd: ROOT, stdio: "inherit" });
 }
 
@@ -89,15 +86,19 @@ function patchFirefoxManifest(manifestPath) {
   const csFile = "e2e-bridge.js";
   fs.copyFileSync(BRIDGE_CS_SRC, path.join(dir, csFile));
 
-  // Append bg-exec-shim to the FF background bundle. APPENDED, not
-  // prepended — FF picks the last-registered chrome.runtime.onMessage
-  // listener's Promise response when multiple listeners return Promises,
-  // so we need to register after TSM's listeners run.
+  // Append page-helpers + bg-exec-shim to the FF background bundle.
+  // APPENDED, not prepended — FF picks the last-registered
+  // chrome.runtime.onMessage listener's Promise response when multiple
+  // listeners return Promises, so we need to register after TSM's
+  // listeners run. page-helpers must come first so PAGE_HELPERS is
+  // defined as a script-scope global by the time the shim closure reads
+  // it.
   const bgPath = path.join(dir, "background", "background.js");
+  const helpers = fs.readFileSync(PAGE_HELPERS_SRC, "utf8");
   const shim = fs.readFileSync(BG_EXEC_SHIM_SRC, "utf8");
   const existing = fs.readFileSync(bgPath, "utf8");
   if (!existing.includes("__e2e_exec__")) {
-    fs.writeFileSync(bgPath, existing + "\n" + shim);
+    fs.writeFileSync(bgPath, existing + "\n" + helpers + "\n" + shim);
   }
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));

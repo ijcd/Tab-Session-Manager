@@ -1,12 +1,12 @@
 const { test, expect } = require("./fixtures/extension");
 const { sendMessage } = require("./helpers/session");
 
-// Diagnostic — verify the bridge can reach TSM message handlers and get
-// a real response back. Targets the simplest, fastest handler.
+// Verify the bridge reaches TSM message handlers, storage, and chrome.*
+// APIs end-to-end. The chrome.* assertions exist mainly for FF where the
+// bridge has more moving parts; on Chrome they are near-trivial.
 
 test("bridge: getInitState reaches TSM and returns a boolean", async ({ extensionPage }) => {
   const result = await sendMessage(extensionPage, { message: "getInitState" });
-  console.log("[smoke] getInitState ->", JSON.stringify(result));
   expect(typeof result).toBe("boolean");
 });
 
@@ -17,14 +17,12 @@ test("bridge: storage.local round-trip", async ({ extensionPage }) => {
   const value = await extensionPage.evaluate(async () => {
     return (await browser.storage.local.get("__smoke_key")).__smoke_key;
   });
-  console.log("[smoke] storage round-trip ->", value);
   expect(value).toBe(42);
 });
 
-test("bridge: tabs.create + tabs.query", async ({ extensionPage }) => {
+test("bridge: tabs.create returns a numeric tab id", async ({ extensionPage }) => {
   const created = await extensionPage.evaluate(async () => {
     return await browser.tabs.create({ url: "https://example.com/__smoke__" });
   });
-  console.log("[smoke] tabs.create ->", JSON.stringify({ id: created.id, url: created.url }));
   expect(typeof created.id).toBe("number");
 });

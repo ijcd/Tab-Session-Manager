@@ -2,9 +2,7 @@ const { test, expect } = require("./fixtures/extension");
 const {
   saveCurrentSession,
   setSettings,
-  getAllSessions
-} = require("./helpers/session");
-const { poll } = require("./helpers/poll");
+  getAllSessions, waitForSessionByName } = require("./helpers/session");
 
 test("saveCurrentSession captures all tabGroups in the live window", async ({
   extensionPage
@@ -34,10 +32,7 @@ test("saveCurrentSession captures all tabGroups in the live window", async ({
   await extensionPage.waitForTimeout(800);
   await saveCurrentSession(extensionPage, "captured-with-groups");
 
-  const saved = await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "captured-with-groups");
-  });
+  const saved = await waitForSessionByName(extensionPage, "captured-with-groups");
 
   expect(saved).toBeTruthy();
   expect(Array.isArray(saved.tabGroups)).toBe(true);

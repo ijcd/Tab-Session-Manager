@@ -2,9 +2,7 @@ const { test, expect } = require("./fixtures/extension");
 const {
   saveCurrentSession,
   getAllSessions,
-  setSettings
-} = require("./helpers/session");
-const { poll } = require("./helpers/poll");
+  setSettings, waitForSessionByName } = require("./helpers/session");
 
 test("saveCurrentSession with saveAllWindows captures every open window", async ({
   extensionPage
@@ -26,10 +24,7 @@ test("saveCurrentSession with saveAllWindows captures every open window", async 
 
   await saveCurrentSession(extensionPage, "sm-session", "saveAllWindows");
 
-  const saved = await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "sm-session");
-  });
+  const saved = await waitForSessionByName(extensionPage, "sm-session");
 
   expect(saved).toBeTruthy();
   // At least the 3 windows we orchestrated.

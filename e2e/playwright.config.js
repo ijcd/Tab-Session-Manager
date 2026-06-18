@@ -16,10 +16,8 @@ module.exports = defineConfig({
   reporter: [["list"]],
   globalSetup: require.resolve("./global-setup.js"),
   timeout: TIMEOUT,
-  // FF + extensions cannot run headless under Playwright (Browser.newPage
-  // protocol errors), so the FF project pops visible windows on macOS.
-  // It is opt-in via E2E_RUN_FF=1 — `npm run e2e` defaults to chrome only,
-  // and `npm run e2e:firefox` / `--project=firefox-mv3` are explicit.
+  // FF is opt-in via E2E_RUN_FF=1. Default `npm run e2e` runs chrome only.
+  // `npm run e2e:firefox` sets E2E_RUN_FF=1 (see package.json).
   projects: [
     {
       name: "chrome-mv3",
@@ -28,7 +26,7 @@ module.exports = defineConfig({
         extensionPath: path.join(FIXTURES, "chrome-mv3")
       }
     },
-    ...(process.env.E2E_RUN_FF === "1" || process.argv.some(a => a.includes("firefox"))
+    ...(process.env.E2E_RUN_FF === "1"
       ? [
           {
             name: "firefox-mv3",

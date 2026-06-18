@@ -3,14 +3,12 @@ const {
   saveCurrentSession,
   openSession,
   getAllSessions,
-  setSettings
-} = require("./helpers/session");
+  setSettings, waitForSessionByName } = require("./helpers/session");
 const {
   getAllWindowIds,
   waitForNewWindow,
   waitForTabsLoaded
 } = require("./helpers/windows");
-const { poll } = require("./helpers/poll");
 
 test("save then restore preserves the tab URL set", async ({ extensionPage }) => {
   await setSettings(extensionPage, { ifLazyLoading: false });
@@ -29,10 +27,7 @@ test("save then restore preserves the tab URL set", async ({ extensionPage }) =>
   await extensionPage.waitForTimeout(1500);
 
   await saveCurrentSession(extensionPage, "rt-session");
-  const saved = await poll(8000, 300, async () => {
-    const all = await getAllSessions(extensionPage);
-    return all.find(s => s.name === "rt-session");
-  });
+  const saved = await waitForSessionByName(extensionPage, "rt-session");
   expect(saved).toBeTruthy();
 
   const baseline = (await getAllWindowIds(extensionPage)).sort();

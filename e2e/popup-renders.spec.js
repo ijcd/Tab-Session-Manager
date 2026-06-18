@@ -1,7 +1,6 @@
 const { test, expect } = require("./fixtures/extension");
 const { importSessions, buildSession } = require("./helpers/session");
-const { openExtensionPage } = require("./helpers/extension-tab");
-const { poll } = require("./helpers/poll");
+const { openExtensionPage, waitForRootMounted } = require("./helpers/extension-tab");
 
 test("popup page renders the React app", async ({
   context,
@@ -25,7 +24,7 @@ test("popup page renders the React app", async ({
     browserType,
     relPath: "popup/index.html"
   });
-  await poll(15000, 200, async () => ((await p.helperCall("rootMounted")) ? true : undefined));
+  await waitForRootMounted(p);
   const bodyLen = await p.helperCall("bodyTextLength");
   expect(bodyLen).toBeGreaterThan(0);
   await p.close();

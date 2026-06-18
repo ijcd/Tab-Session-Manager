@@ -1,11 +1,28 @@
-let _idCounter = 1000;
-function nextId() {
-  return ++_idCounter;
-}
+const { poll } = require("./poll");
+const { SETTLE } = require("./constants");
 
-// Build a synthetic TSM session matching the shape produced by save.js.
-// windows: [{ urls: [...], groups?: [{ tabIndices: [...], title, color }] }, ...]
-function buildSession({ id = "e2e-session", name = "e2e session", windows = [] } = {}) {
+// Synthetic TSM session matching the shape produced by save.js.
+//
+// windows: [
+//   {
+//     urls: [string, ...],
+//     groups?: [{ tabIndices: number[], title, color }],
+//     // Per-tab overrides keyed by tab index. Use for pinned/active tests.
+//     tabOverrides?: { [tabIndex]: Partial<TabRecord> }
+//   },
+//   ...
+// ]
+//
+// `idSeed` makes the builder pure: same input + same seed → same output.
+function buildSession({
+  id = "e2e-session",
+  name = "e2e session",
+  windows = [],
+  idSeed = 1000
+} = {}) {
+  let _id = idSeed;
+  const nextId = () => ++_id;
+
   const session = {
     id,
     name,
@@ -24,6 +41,7 @@ function buildSession({ id = "e2e-session", name = "e2e session", windows = [] }
     const windowId = winIdx + 1;
     const tabs = {};
     const groupIds = (winSpec.groups || []).map(() => nextId());
+    const overrides = winSpec.tabOverrides || {};
 
     winSpec.urls.forEach((url, i) => {
       const tabId = 100 + windowId * 100 + i;
@@ -41,7 +59,8 @@ function buildSession({ id = "e2e-session", name = "e2e session", windows = [] }
         pinned: false,
         incognito: false,
         groupId,
-        cookieStoreId: "firefox-default"
+        cookieStoreId: "firefox-default",
+        ...(overrides[i] || {})
       };
       session.tabsNumber++;
     });
@@ -68,33 +87,27 @@ function buildSession({ id = "e2e-session", name = "e2e session", windows = [] }
   return session;
 }
 
-// Wake the background SW and ensure init() runs, then merge a Settings patch
-// into storage. TSM keeps all settings under one "Settings" key.
+// Read/write helpers for TSM's single-key "Settings" bag. Timeouts scale
+// up under COVERAGE=1 because the instrumented bundle boots slower.
 async function setSettings(page, patch) {
-  // Wake the SW and ensure init() has run before we read/write Settings.
-  // TSM's init() populates defaults into the Settings storage key on
-  // first run; without waiting for it, our patch can be overwritten by
-  // the defaults that init writes afterwards.
-  await page.evaluate(async () => {
-    await browser.runtime.sendMessage({ message: "getInitState" });
-  });
-  // Poll until the SW has populated defaults for the keys we are about
-  // to patch — confirms init() finished. Larger timeout under coverage
-  // because the instrumented bundle takes longer to boot.
-  const { poll } = require("./poll");
+  // Wake the SW and let init() populate defaults before we patch.
+  await sendMessage(page, { message: "getInitState" });
   const initTimeout = process.env.COVERAGE === "1" ? 30000 : 8000;
   await poll(initTimeout, 200, async () => {
-    const present = await page.evaluate(async () => {
-      return (await browser.storage.local.get("Settings")).Settings ? true : false;
-    });
+    const present = await page.evaluate(
+      async () => !!(await browser.storage.local.get("Settings")).Settings
+    );
     return present ? true : undefined;
   });
-  await page.evaluate(async newSettings => {
+
+  await page.evaluate(async next => {
     const existing = (await browser.storage.local.get("Settings")).Settings || {};
-    await browser.storage.local.set({ Settings: { ...existing, ...newSettings } });
+    await browser.storage.local.set({ Settings: { ...existing, ...next } });
   }, patch);
-  // Verify the storage write took effect AND wait for storage.onChanged
-  // → handleSettingsChange to refresh the in-memory currentSettings.
+
+  // Confirm both the storage write AND that the BG's in-memory
+  // currentSettings has refreshed via storage.onChanged. Polling on the
+  // storage read also waits past the listener fan-out window.
   const verifyTimeout = process.env.COVERAGE === "1" ? 15000 : 8000;
   await poll(verifyTimeout, 100, async () => {
     const ok = await page.evaluate(async expected => {
@@ -103,13 +116,10 @@ async function setSettings(page, patch) {
     }, patch);
     return ok ? true : undefined;
   });
-  await page.waitForTimeout(300);
 }
 
 async function sendMessage(page, message) {
-  return page.evaluate(async msg => {
-    return await browser.runtime.sendMessage(msg);
-  }, message);
+  return page.evaluate(async msg => await browser.runtime.sendMessage(msg), message);
 }
 
 async function getAllSessions(page) {
@@ -118,10 +128,6 @@ async function getAllSessions(page) {
 
 async function getSession(page, id) {
   return sendMessage(page, { message: "getSessions", id });
-}
-
-async function deleteAllSessions(page) {
-  return sendMessage(page, { message: "deleteAllSessions" });
 }
 
 async function openSession(page, session, property = "openInNewWindow") {
@@ -136,24 +142,52 @@ async function importSessions(page, sessions) {
   return sendMessage(page, { message: "import", importSessions: sessions });
 }
 
+async function getSearchInfo(page) {
+  return sendMessage(page, { message: "getsearchInfo" });
+}
+
+// Named message wrappers — pure indirection but they make spec code
+// read closer to the domain than raw sendMessage call sites.
 async function addTag(page, id, tag) {
   return sendMessage(page, { message: "addTag", id, tag });
 }
-
 async function removeTag(page, id, tag) {
   return sendMessage(page, { message: "removeTag", id, tag });
 }
-
 async function renameSession(page, id, name) {
   return sendMessage(page, { message: "rename", id, name });
 }
-
 async function removeSession(page, id) {
   return sendMessage(page, { message: "remove", id });
 }
+async function deleteAllSessions(page) {
+  return sendMessage(page, { message: "deleteAllSessions" });
+}
 
-async function getSearchInfo(page) {
-  return sendMessage(page, { message: "getsearchInfo" });
+// Wait for `saveCurrentSession` / autosave / etc. to land an
+// IndexedDB record with the given name.
+async function waitForSessionByName(page, name, timeoutMs = 8000) {
+  return poll(timeoutMs, 300, async () => {
+    const all = await getAllSessions(page);
+    return all.find(s => s.name === name);
+  });
+}
+
+// Trigger a chrome.alarms event by clearing + recreating with a tiny
+// delay. Used by autosave-regular / backup-trigger.
+async function fireAlarm(context, alarmName, delayInMinutes = 0.01) {
+  const [sw] = context.serviceWorkers();
+  if (!sw) return false;
+  await sw.evaluate(
+    async ({ name, delay }) => {
+      try {
+        await chrome.alarms.clear(name);
+        chrome.alarms.create(name, { delayInMinutes: delay });
+      } catch {}
+    },
+    { name: alarmName, delay: delayInMinutes }
+  );
+  return true;
 }
 
 module.exports = {
@@ -162,13 +196,16 @@ module.exports = {
   sendMessage,
   getAllSessions,
   getSession,
-  deleteAllSessions,
   openSession,
   saveCurrentSession,
   importSessions,
+  getSearchInfo,
   addTag,
   removeTag,
   renameSession,
   removeSession,
-  getSearchInfo
+  deleteAllSessions,
+  waitForSessionByName,
+  fireAlarm,
+  SETTLE
 };
