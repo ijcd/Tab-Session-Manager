@@ -17,7 +17,7 @@ test("addToCurrentWindow appends restored tabs to the current window", async ({ 
   await extensionPage.evaluate(async () => {
     await browser.tabs.create({ url: "https://example.com/existing", active: false });
   });
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
 
   const beforeWindowIds = (await getAllWindowIds(extensionPage)).sort();
   const beforeTabsCount = await extensionPage.evaluate(async () => {

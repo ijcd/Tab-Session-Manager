@@ -21,12 +21,12 @@ test("popup deeply renders sessions, menus, and tag chips", async ({
     })
   );
   await importSessions(extensionPage, sessions);
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
   for (let i = 0; i < 3; i++) {
     await addTag(extensionPage, sessions[i].id, "alpha");
     await addTag(extensionPage, sessions[i].id, "beta");
   }
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
 
   const p = await openExtensionPage({
     context,
@@ -56,7 +56,7 @@ test("popup deeply renders sessions, menus, and tag chips", async ({
     for (let i = 0; i < Math.min(count, 4); i++) {
       try {
         await p.helperCall("clickFirst", `${sel}:nth-of-type(${i + 1})`);
-        await p.waitForTimeout(80);
+        await p.waitForTimeout(50);
       } catch {
         alive = false;
         break outer;
@@ -88,7 +88,7 @@ test("popup search input fires onChange handlers", async ({
       windows: [{ urls: ["https://example.com/sb"] }]
     })
   ]);
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
 
   const p = await openExtensionPage({
     context,
@@ -103,7 +103,7 @@ test("popup search input fires onChange handlers", async ({
   // Focus search and fire input events to drive SearchBar onChange.
   for (const sel of ['input[type="search"]', 'input[type="text"]']) {
     await p.helperCall("clickFirst", sel);
-    await p.waitForTimeout(150);
+    await p.waitForTimeout(75);
   }
   await p.close();
 });

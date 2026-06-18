@@ -15,7 +15,7 @@ test("tracking flow round-trip with storage check", async ({ extensionPage }) =>
     windows: [{ urls: ["https://example.com/trk"] }]
   });
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   await sendMessage(extensionPage, {
     message: "startTracking",
@@ -23,7 +23,7 @@ test("tracking flow round-trip with storage check", async ({ extensionPage }) =>
     originalWindowId: 100,
     openedWindowId: 200
   });
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
 
   // updateTrackingStatus tracks the current state — exercise it.
   await sendMessage(extensionPage, { message: "updateTrackingStatus" });
@@ -34,7 +34,7 @@ test("tracking flow round-trip with storage check", async ({ extensionPage }) =>
     sessionId: session.id,
     originalWindowId: 100
   });
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
 });
 
 test("session.storage tracking-info is preserved across operations", async ({

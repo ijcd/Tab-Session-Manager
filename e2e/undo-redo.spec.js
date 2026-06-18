@@ -15,20 +15,20 @@ test("undo reverts a rename, redo re-applies it", async ({ extensionPage }) => {
 
   // Use the "save" message (not import) so recordChange runs.
   await sendMessage(extensionPage, { message: "save", session });
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   await renameSession(extensionPage, session.id, "renamed");
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
   let current = await getSession(extensionPage, session.id);
   expect(current.name).toBe("renamed");
 
   await sendMessage(extensionPage, { message: "undo" });
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
   current = await getSession(extensionPage, session.id);
   expect(current.name).toBe("original");
 
   await sendMessage(extensionPage, { message: "redo" });
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
   current = await getSession(extensionPage, session.id);
   expect(current.name).toBe("renamed");
 });

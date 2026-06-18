@@ -25,7 +25,7 @@ test("options shortcuts page renders the form for each command", async ({
   // Click a few inputs to drive focus/blur handlers in KeyboardShortcutForm.
   for (let i = 0; i < Math.min(inputCount, 3); i++) {
     await p.helperCall("clickFirst", `input:nth-of-type(${i + 1})`);
-    await p.waitForTimeout(150);
+    await p.waitForTimeout(75);
   }
   // Click any reset/cancel button.
   await p.helperCall("clickFirstByText", { selector: "button", text: "" });

@@ -35,10 +35,12 @@ function attachCoverageCapture(context) {
       // by the periodic flush below.
     });
     // Periodically flush coverage so we capture even pages that close
-    // abruptly before our pre-close hook can fire.
+    // abruptly before our pre-close hook can fire. The interval is the
+    // worst-case capture lag — make it short enough that test-end close
+    // is rarely beaten by it.
     const interval = setInterval(() => {
       dump().catch(() => {});
-    }, 1500);
+    }, 500);
     page.on("close", () => clearInterval(interval));
   });
 }

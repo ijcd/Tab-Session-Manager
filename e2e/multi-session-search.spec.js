@@ -22,12 +22,12 @@ test("search info includes tags and url fragments across multiple sessions", asy
     })
   );
   await importSessions(extensionPage, sessions);
-  await extensionPage.waitForTimeout(500);
+  await extensionPage.waitForTimeout(250);
 
   for (const s of sessions.slice(0, 3)) {
     await addTag(extensionPage, s.id, "batch");
   }
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   const info = await getSearchInfo(extensionPage);
   expect(info.length).toBeGreaterThanOrEqual(sessions.length);
@@ -44,7 +44,7 @@ test("requestAllSessions streaming returns rows", async ({ extensionPage }) => {
       windows: [{ urls: ["https://example.com/stream"] }]
     })
   ]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   // requestAllSessions broadcasts via runtime.sendMessage in chunks — we
   // just exercise the path; result will be undefined from sender side.
@@ -54,5 +54,5 @@ test("requestAllSessions streaming returns rows", async ({ extensionPage }) => {
     count: 10,
     port: "e2e-stream-port"
   });
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
 });

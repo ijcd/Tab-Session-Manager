@@ -23,7 +23,7 @@ test("options page renders the React app and main scaffolding", async ({
       windows: [{ urls: ["https://example.com/opts"] }]
     })
   ]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   const p = await openExtensionPage({
     context,
@@ -53,7 +53,7 @@ for (const { hash, label } of ROUTES) {
       relPath: `options/index.html${hash}`
     });
     await waitForRootMounted(p);
-    await p.waitForTimeout(800);
+    await p.waitForTimeout(400);
     const bodyLen = await p.helperCall("bodyTextLength");
     expect(bodyLen).toBeGreaterThan(0);
     await p.close();

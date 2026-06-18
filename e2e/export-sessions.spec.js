@@ -23,7 +23,7 @@ test("exportSessions triggers a download for an imported session", async ({
     windows: [{ urls: ["https://example.com/exp"] }]
   });
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
 
   await sendMessage(extensionPage, {
     message: "exportSessions",

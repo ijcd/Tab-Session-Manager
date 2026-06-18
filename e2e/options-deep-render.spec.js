@@ -32,7 +32,7 @@ test("options page exercises every setting category", async ({
     relPath: "options/index.html#/settings"
   });
   await waitForRootMounted(p);
-  await p.waitForTimeout(800);
+  await p.waitForTimeout(400);
 
   // Click every category header / collapsible to render each category
   // body, exercising OptionContainer + each option's render path.
@@ -45,7 +45,7 @@ test("options page exercises every setting category", async ({
       "clickFirst",
       `.categoryHeader:nth-of-type(${i + 1}), h2:nth-of-type(${i + 1})`
     );
-    await p.waitForTimeout(100);
+    await p.waitForTimeout(50);
   }
 
   // Click each top-level button / input to fire change handlers.
@@ -107,7 +107,7 @@ test("options information page mounts and shows version info", async ({
     relPath: "options/index.html#/information"
   });
   await waitForRootMounted(p);
-  await p.waitForTimeout(800);
+  await p.waitForTimeout(400);
   const bodyLen = await p.helperCall("bodyTextLength");
   expect(bodyLen).toBeGreaterThan(0);
   await p.close();
@@ -128,7 +128,7 @@ test("options shortcuts page mounts", async ({
     relPath: "options/index.html#/shortcuts"
   });
   await waitForRootMounted(p);
-  await p.waitForTimeout(800);
+  await p.waitForTimeout(400);
   const bodyLen = await p.helperCall("bodyTextLength");
   expect(bodyLen).toBeGreaterThan(0);
   await p.close();

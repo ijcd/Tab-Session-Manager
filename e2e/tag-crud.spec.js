@@ -16,22 +16,22 @@ test("addTag / removeTag / rename update an existing session", async ({ extensio
   });
 
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   await addTag(extensionPage, session.id, "alpha");
   await addTag(extensionPage, session.id, "beta");
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
 
   let fetched = await getSession(extensionPage, session.id);
   expect(fetched.tag.sort()).toEqual(["alpha", "beta"]);
 
   await removeTag(extensionPage, session.id, "alpha");
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
   fetched = await getSession(extensionPage, session.id);
   expect(fetched.tag).toEqual(["beta"]);
 
   await renameSession(extensionPage, session.id, "renamed");
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
   fetched = await getSession(extensionPage, session.id);
   expect(fetched.name).toBe("renamed");
 });

@@ -20,14 +20,14 @@ test("remove deletes a session from IndexedDB", async ({ extensionPage }) => {
   });
 
   await importSessions(extensionPage, [a, b]);
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
 
   const beforeIds = (await getAllSessions(extensionPage)).map(s => s.id);
   expect(beforeIds).toContain("e2e-remove-a");
   expect(beforeIds).toContain("e2e-remove-b");
 
   await removeSession(extensionPage, "e2e-remove-a");
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   const afterIds = (await getAllSessions(extensionPage)).map(s => s.id);
   expect(afterIds).not.toContain("e2e-remove-a");

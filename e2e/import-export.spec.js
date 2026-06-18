@@ -16,7 +16,7 @@ test("import stores a session that getSessions can read back", async ({ extensio
   await importSessions(extensionPage, [session]);
 
   // import calls saveSession which writes to IndexedDB asynchronously.
-  await extensionPage.waitForTimeout(500);
+  await extensionPage.waitForTimeout(250);
 
   const fetched = await getSession(extensionPage, session.id);
   expect(fetched).toBeTruthy();
@@ -36,13 +36,13 @@ test("importing a duplicate session by id is a no-op", async ({ extensionPage })
   });
 
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   // Re-import the same session id with a different name. Import dedupes by
   // (id, lastEditedTime) so the older copy wins.
   const dupe = { ...session, name: "second" };
   await importSessions(extensionPage, [dupe]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   const all = await getAllSessions(extensionPage);
   const matches = all.filter(s => s.id === session.id);

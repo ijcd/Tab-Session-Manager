@@ -18,7 +18,7 @@ test("backupSessions alarm runs and the source session remains in storage", asyn
     windows: [{ urls: ["https://example.com/bk"] }]
   });
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(400);
+  await extensionPage.waitForTimeout(200);
 
   await fireAlarm(context, "backupSessions");
   await extensionPage.waitForTimeout(2000);

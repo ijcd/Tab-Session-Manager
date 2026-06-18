@@ -17,7 +17,7 @@ test("popup lists imported sessions", async ({
     })
   );
   await importSessions(extensionPage, sessions);
-  await extensionPage.waitForTimeout(500);
+  await extensionPage.waitForTimeout(250);
 
   const p = await openExtensionPage({
     context,
@@ -62,7 +62,7 @@ test("popup clicking buttons exercises action handlers", async ({
   // Click a few buttons; we don't care about success — coverage is the goal.
   for (let i = 0; i < Math.min(btnCount, 3); i++) {
     await p.helperCall("clickFirst", `button:nth-of-type(${i + 1})`);
-    await p.waitForTimeout(150);
+    await p.waitForTimeout(75);
   }
   await p.close();
 });

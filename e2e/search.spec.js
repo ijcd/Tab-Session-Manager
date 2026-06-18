@@ -20,7 +20,7 @@ test("getsearchInfo returns a search entry per imported session", async ({ exten
   ];
 
   await importSessions(extensionPage, sessions);
-  await extensionPage.waitForTimeout(500);
+  await extensionPage.waitForTimeout(250);
 
   const info = await getSearchInfo(extensionPage);
   expect(Array.isArray(info)).toBe(true);

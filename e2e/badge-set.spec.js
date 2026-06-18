@@ -24,13 +24,13 @@ test("saving multiple sessions exercises badge updates", async ({ extensionPage 
       })
     )
   );
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
 
   // Save 2 more "current" sessions to keep triggering the save path.
   await extensionPage.evaluate(async () => {
     await browser.tabs.create({ url: "https://example.com/badge-x", active: false });
   });
-  await extensionPage.waitForTimeout(500);
+  await extensionPage.waitForTimeout(250);
   await saveCurrentSession(extensionPage, "badge-current");
   await waitForSessionByName(extensionPage, "badge-current");
 });

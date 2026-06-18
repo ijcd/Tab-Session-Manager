@@ -15,7 +15,7 @@ test("saveCurrentSession persists the live tabs into a session record", async ({
   }, ["https://example.com/sc1", "https://example.com/sc2", "https://example.com/sc3"]);
 
   // Wait for tabs to land.
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
 
   await saveCurrentSession(extensionPage, "captured-session");
 

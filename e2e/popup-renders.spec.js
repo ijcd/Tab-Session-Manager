@@ -15,7 +15,7 @@ test("popup page renders the React app", async ({
       windows: [{ urls: ["https://example.com/p"] }]
     })
   ]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   const p = await openExtensionPage({
     context,

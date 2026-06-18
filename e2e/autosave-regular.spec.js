@@ -24,7 +24,7 @@ test("autoSaveRegular fires and lands a 'regular'-tagged session", async ({
     await browser.tabs.create({ url: "https://example.com/ar1", active: false });
     await browser.tabs.create({ url: "https://example.com/ar2", active: false });
   });
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
 
   await fireAlarm(context, "autoSaveRegular");
 

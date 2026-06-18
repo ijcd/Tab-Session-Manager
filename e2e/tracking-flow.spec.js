@@ -14,7 +14,7 @@ test("startTracking + endTrackingByWindowDelete exercise the tracking flow", asy
     windows: [{ urls: ["https://example.com/track"] }]
   });
   await importSessions(extensionPage, [session]);
-  await extensionPage.waitForTimeout(300);
+  await extensionPage.waitForTimeout(150);
 
   // Pick arbitrary window IDs — startTracking just stores them.
   await sendMessage(extensionPage, {
@@ -23,7 +23,7 @@ test("startTracking + endTrackingByWindowDelete exercise the tracking flow", asy
     originalWindowId: 1,
     openedWindowId: 2
   });
-  await extensionPage.waitForTimeout(200);
+  await extensionPage.waitForTimeout(100);
 
   await sendMessage(extensionPage, {
     message: "endTrackingByWindowDelete",

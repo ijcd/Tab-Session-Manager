@@ -29,7 +29,7 @@ test("saveCurrentSession captures all tabGroups in the live window", async ({
     return [gA, gB];
   });
 
-  await extensionPage.waitForTimeout(800);
+  await extensionPage.waitForTimeout(400);
   await saveCurrentSession(extensionPage, "captured-with-groups");
 
   const saved = await waitForSessionByName(extensionPage, "captured-with-groups");

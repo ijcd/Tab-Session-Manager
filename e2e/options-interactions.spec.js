@@ -18,7 +18,7 @@ test("options page sidebar navigation cycles through routes", async ({
 
   for (const hash of ["#/sessions", "#/settings", "#/shortcuts", "#/information"]) {
     await p.helperCall("setHash", hash);
-    await p.waitForTimeout(400);
+    await p.waitForTimeout(200);
     const current = await p.helperCall("getHash");
     expect(current).toMatch(new RegExp(hash.replace(/\//g, "/?")));
     const bodyLen = await p.helperCall("bodyTextLength");
@@ -54,7 +54,7 @@ test("options page settings checkboxes are clickable", async ({
   // exercise SettingsPage's onChange handler.
   for (let i = 0; i < Math.min(count, 3); i++) {
     await p.helperCall("clickFirst", `input[type="checkbox"]:nth-of-type(${i + 1})`);
-    await p.waitForTimeout(200);
+    await p.waitForTimeout(100);
   }
 
   await p.close();
