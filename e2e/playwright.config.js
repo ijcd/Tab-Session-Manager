@@ -7,11 +7,19 @@ const FIXTURES = path.resolve(__dirname, ".fixtures");
 // the size and noticeably slower to load. Bump timeouts accordingly.
 const TIMEOUT = process.env.COVERAGE === "1" ? 90000 : 30000;
 
+// Workers default to 4 for Chrome (cheap headless launches), 2 for FF
+// (heavier per process). Override with E2E_WORKERS=N.
+const WORKERS = process.env.E2E_WORKERS
+  ? Number(process.env.E2E_WORKERS)
+  : process.env.E2E_RUN_FF === "1"
+  ? 2
+  : 4;
+
 module.exports = defineConfig({
   testDir: __dirname,
   testMatch: /.*\.spec\.js$/,
   fullyParallel: false,
-  workers: 1,
+  workers: WORKERS,
   retries: 0,
   reporter: [["list"]],
   globalSetup: require.resolve("./global-setup.js"),
