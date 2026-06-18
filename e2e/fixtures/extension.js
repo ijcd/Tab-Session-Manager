@@ -23,11 +23,10 @@ const test = base.extend({
     // (Playwright >=1.46). Firefox still requires headed.
     const launchOptions = browserType === "firefox"
       ? {
-          // FF + extensions cannot run headless under Playwright; the
-          // Browser.newPage protocol errors out. We launch headed but
-          // position the window off-screen so it does not steal focus
-          // (see firefoxUserPrefs below).
-          headless: false,
+          // With the patched Juggler in Nightly's omni.ja (closes the
+          // extra-tab spawned by temp addon install before its "expected
+          // exactly 1 tab" assertion), FF can run headless with extensions.
+          headless: true,
           acceptDownloads: true,
           // Auto-accept downloads to a temp dir so the FF "save file"
           // dialog does not hang context teardown when a test triggers
